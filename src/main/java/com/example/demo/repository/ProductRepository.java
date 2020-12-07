@@ -27,5 +27,5 @@ public interface ProductRepository extends JpaRepository<Product, Long>,
                 .first((SingleValueBinding<StringPath, String>) StringExpression::containsIgnoreCase);
     }
 
-    List<Product> findAllByCode(List<String> code);
+    List<Product> findAllByCodeInAndPriceIsNotNull(List<String> code);
 }

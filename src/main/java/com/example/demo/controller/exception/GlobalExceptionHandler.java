@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.context.request.WebRequest;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @ControllerAdvice
@@ -44,9 +45,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(value = {InvalidOrderException.class})
-    public ResponseEntity<ApiErrorDto> handleOutOfStockException(InvalidOrderException ex, WebRequest request) {
+    public ResponseEntity<Map<String, List<String>>> handleOutOfStockException(InvalidOrderException ex, WebRequest request) {
         LOGGER.error(request.getContextPath(), ex);
-        return buildErrorResponse(HttpStatus.UNPROCESSABLE_ENTITY, ex);
+        Map<String, List<String>> errors = new HashMap<>();
+        errors.put("notFound", ex.getNotFoundProductCodes());
+        errors.put("outOfStock", ex.getOutOfStockProductCodes());
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errors);
     }
 
     @ResponseStatus(HttpStatus.BAD_REQUEST)

@@ -62,12 +62,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public List<OrderItemDto> processOrder(List<OrderItemDto> orderItems) throws InvalidOrderException {
-        List<Product> products = productRepository.findAllByCode(
-                orderItems.stream()
-                        .map(OrderItemDto::getCode)
-                        .collect(Collectors.toList()));
+        List<Product> products = getProducts(orderItems);
 
-        List<OrderItemDto> failedOrderItems = new ArrayList<>();
+        List<OrderItemDto> outOfStock = new ArrayList<>();
         List<OrderItemDto> successOrderItems = new ArrayList<>();
         products.forEach(product -> {
             OrderItemDto orderItemDto = orderItems.stream()
@@ -77,19 +74,48 @@ public class ProductServiceImpl implements ProductService {
                 successOrderItems.add(new OrderItemDto(product));
                 product.setQuantity(product.getQuantity() - orderItemDto.getQuantity());
             } else {
-                failedOrderItems.add(orderItemDto);
+                outOfStock.add(orderItemDto);
             }
         });
 
-        // throw error if there is failed items
-        if (!failedOrderItems.isEmpty()) {
-            throw new InvalidOrderException("Cannot process some order items"
-                    + orderItems.stream()
-                    .map(OrderItemDto::getCode)
-                    .collect(Collectors.joining(",")));
-        }
+        validateOrder(orderItems, successOrderItems, outOfStock);
 
         productRepository.saveAll(products);
         return successOrderItems;
+    }
+
+    private void validateOrder(List<OrderItemDto> requestOrderItemDto,
+                               List<OrderItemDto> successOrderItems,
+                               List<OrderItemDto> failedOrderItems) throws InvalidOrderException {
+
+        List<String> notFound = new ArrayList<>();
+        List<String> outOfStock = new ArrayList<>();
+        // throw error if there is failed items
+        if (!failedOrderItems.isEmpty()) {
+            outOfStock = failedOrderItems.stream()
+                    .map(OrderItemDto::getCode)
+                    .collect(Collectors.toList());
+        }
+
+        if (requestOrderItemDto.size() > successOrderItems.size()) {
+            notFound = requestOrderItemDto.stream()
+                    .map(OrderItemDto::getCode)
+                    .collect(Collectors.toList());
+            notFound.removeAll(successOrderItems.stream()
+                    .map(OrderItemDto::getCode)
+                    .collect(Collectors.toList()));
+        }
+
+        if (notFound.size() > 0 || outOfStock.size() > 0) {
+            throw new InvalidOrderException(notFound, outOfStock);
+        }
+    }
+
+    private List<Product> getProducts(List<OrderItemDto> orderItems) {
+        List<Product> products = productRepository.findAllByCodeInAndPriceIsNotNull(
+                orderItems.stream()
+                        .map(OrderItemDto::getCode)
+                        .collect(Collectors.toList()));
+        return products;
     }
 }
